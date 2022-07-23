@@ -7,7 +7,7 @@ import escapism
 from jupyterhub.proxy import Proxy
 from jupyterhub.utils import exponential_backoff
 from kubernetes_asyncio import client
-from traitlets import Unicode
+from traitlets import Dict, Unicode
 
 from .clients import load_config, shared_client
 from .objects import make_ingress
@@ -185,6 +185,24 @@ class KubeIngressProxy(Proxy):
         """,
     )
 
+    extra_labels = Dict(
+        config=True,
+        help="""
+        Extra labels to set on the ingress, service, and endpoint objects created
+        during route creation. The keys and values must both be strings that match the
+        kubernetes label key / value constraints.
+        """,
+    )
+
+    extra_annotations = Dict(
+        config=True,
+        help="""
+        Extra annotations to set on the ingress, service, and endpoint objects created
+        during route creation. The keys and values must both be strings.
+        """,
+    )
+
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         load_config(host=self.k8s_api_host, ssl_ca_cert=self.k8s_api_ssl_ca_cert)
@@ -239,12 +257,13 @@ class KubeIngressProxy(Proxy):
 
         safe_name = self._safe_name_for_routespec(routespec).lower()
         labels = {
+            **self.extra_labels,
             'heritage': 'jupyterhub',
             'component': self.component_label,
             'hub.jupyter.org/proxy-route': 'true',
         }
         endpoint, service, ingress = make_ingress(
-            safe_name, routespec, target, labels, data
+            safe_name, routespec, target, labels, self.extra_annotations, data
         )
 
         async def ensure_object(create_func, patch_func, body, kind):
@@ -279,7 +298,7 @@ class KubeIngressProxy(Proxy):
                 'Could not find endpoints/%s after creating it' % safe_name,
             )
         else:
-            delete_endpoint = await self.core_api.delete_namespaced_endpoints(
+            delete_endpoint = self.core_api.delete_namespaced_endpoints(
                 name=safe_name,
                 namespace=self.namespace,
                 body=client.V1DeleteOptions(grace_period_seconds=0),
@@ -321,19 +340,19 @@ class KubeIngressProxy(Proxy):
 
         delete_options = client.V1DeleteOptions(grace_period_seconds=0)
 
-        delete_endpoint = await self.core_api.delete_namespaced_endpoints(
+        delete_endpoint = self.core_api.delete_namespaced_endpoints(
             name=safe_name,
             namespace=self.namespace,
             body=delete_options,
         )
 
-        delete_service = await self.core_api.delete_namespaced_service(
+        delete_service = self.core_api.delete_namespaced_service(
             name=safe_name,
             namespace=self.namespace,
             body=delete_options,
         )
 
-        delete_ingress = await self.networking_api.delete_namespaced_ingress(
+        delete_ingress = self.networking_api.delete_namespaced_ingress(
             name=safe_name,
             namespace=self.namespace,
             body=delete_options,

@@ -2063,7 +2063,6 @@ class KubeSpawner(Spawner):
             name=self.secret_name,
             username=self.user.name,
             cert_paths=self.cert_paths,
-            hub_ca=self.internal_trust_bundles['hub-ca'],
             owner_references=[owner_reference],
             labels=labels,
             annotations=annotations,

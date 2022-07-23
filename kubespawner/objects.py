@@ -728,13 +728,14 @@ def make_pvc(
     return pvc
 
 
-def make_ingress(name, routespec, target, labels, data):
+def make_ingress(name, routespec, target, labels, annotations, data):
     """
     Returns an ingress, service, endpoint object that'll work for this service
     """
     meta = V1ObjectMeta(
         name=name,
         annotations={
+            **annotations,
             'hub.jupyter.org/proxy-data': json.dumps(data),
             'hub.jupyter.org/proxy-routespec': routespec,
             'hub.jupyter.org/proxy-target': target,
@@ -846,7 +847,6 @@ def make_secret(
     name,
     username,
     cert_paths,
-    hub_ca,
     owner_references,
     labels=None,
     annotations=None,
@@ -893,12 +893,6 @@ def make_secret(
     with open(cert_paths['cafile']) as file:
         encoded = base64.b64encode(file.read().encode("utf-8"))
         secret.data["notebooks-ca_trust.crt"] = encoded.decode("utf-8")
-
-    with open(hub_ca) as file:
-        encoded = base64.b64encode(file.read().encode("utf-8"))
-        secret.data["notebooks-ca_trust.crt"] = secret.data[
-            "notebooks-ca_trust.crt"
-        ] + encoded.decode("utf-8")
 
     return secret
 
